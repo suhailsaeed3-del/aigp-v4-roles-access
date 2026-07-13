@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: aitp-portal
+  namespace: aitp
+spec:
+  selector: { app: aitp-portal }
+  ports:
+    - port: 80
+      targetPort: 3000

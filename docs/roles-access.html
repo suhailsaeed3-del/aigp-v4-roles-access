@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Roles, Pages & Access</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'IBM Plex Sans Arabic', Tahoma, sans-serif; color: #14213d; margin: 0; font-size: 12.5px; line-height: 1.65; }
+  .page { padding: 34px 44px; }
+  h1 { font-size: 24px; color: #16408F; margin: 26px 0 8px; border-bottom: 3px solid #2563EB; padding-bottom: 8px; }
+  h2 { font-size: 17px; color: #16408F; margin: 22px 0 6px; page-break-before: always; border-bottom: 2px solid #DCE6F5; padding-bottom: 6px; }
+  h3 { font-size: 14px; color: #1D4ED8; margin: 16px 0 4px; }
+  p { margin: 6px 0; }
+  ul { margin: 6px 0; padding-left: 22px; }
+  li { margin: 3px 0; }
+  code { background: #EFF3FA; border: 1px solid #DCE6F5; border-radius: 4px; padding: 0 4px; font-family: Consolas, monospace; font-size: 11.5px; }
+  pre { background: #0F1F3D; color: #E7EEFB; border-radius: 8px; padding: 12px 14px; overflow: hidden; }
+  pre code { background: transparent; border: none; color: inherit; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 11.5px; page-break-inside: avoid; }
+  th { background: #16408F; color: #fff; text-align: left; padding: 6px 9px; }
+  td { border: 1px solid #DCE6F5; padding: 5px 9px; vertical-align: top; }
+  tr:nth-child(even) td { background: #F6F9FE; }
+  .cover { height: 96vh; display: flex; flex-direction: column; justify-content: center; padding: 60px; background: linear-gradient(160deg, #0F1F3D 0%, #16408F 70%, #2563EB 100%); color: #fff; }
+  .cover h1 { border: none; color: #fff; font-size: 32px; margin: 0 0 8px; }
+  .cover .sub { font-size: 16px; opacity: .85; margin-bottom: 30px; }
+  .cover .meta { font-size: 13px; opacity: .8; line-height: 2; }
+</style>
+</head>
+<body>
+<div class="cover">
+  <h1>Roles, Pages &amp; Access</h1>
+  <div class="sub">دليل الأدوار والصلاحيات — AIGP Transformation Portal</div>
+  <div class="meta">
+    For the IT team — who each role is, the pages they see, the actions they can take,<br>
+    the workflow gates, and the exact server-enforced permission matrix.<br>
+    Maintained in git at docs/roles-pages-access.md · 13 July 2026
+  </div>
+</div>
+<div class="page">
+<p>A plain-language reference for IT: <strong>who each role is, which pages they see, what they can do, and what the server lets them touch.</strong> The authoritative sources in code are <code>prisma/seed.ts</code> (permission matrix), <code>lib/security/rbac.ts</code> (enforcement) and <code>lib/viewModel.ts</code> (page/menu scoping).</p>
+<h2>1. How access works (two layers)</h2>
+<ul>
+<li><strong>UI role</strong> (<code>users.role</code>, one of <code>coord / entity / path / ai / admin</code>) — decides which <strong>screens, menus, cards and buttons</strong> the user sees.</li>
+<li><strong>Backend RBAC</strong> (<code>user_roles</code> → <code>role_permissions</code> + entity/stream scopes) — every API call re-checks: valid session → permission code → entity/stream scope → action, and writes an <code>audit_logs</code> row. Hiding a button is UX only; the server check is what actually protects the data.</li>
+</ul>
+<p>On first login the identity (UAE PASS / Workspace ONE / mock-dev) is mapped to a <code>users</code> row; the UI role and backend role are assigned from <code>role_assignment_rules</code>, team setup, or the admin APIs.</p>
+<h2>2. Quick reference</h2>
+<table><thead><tr><th>UI role</th><th>Arabic</th><th>Backend code</th><th>Data scope</th><th>One-line job</th></tr></thead><tbody>
+<tr><td><code>coord</code></td><td>منسق المسار في الجهة</td><td><code>entity_coordinator</code></td><td><strong>own entity + own stream</strong> (incl. drafts)</td><td>Creates and submits the entity's entries for one stream</td></tr>
+<tr><td><code>entity</code></td><td>ممثل الجهة</td><td><code>entity_representative</code></td><td><strong>own entity</strong>, all streams (no drafts)</td><td>The sole approver of the entity's entries (ent1 gate)</td></tr>
+<tr><td><code>path</code></td><td>رئيس المسار</td><td><code>stream_owner</code></td><td><strong>own stream</strong>, all entities (approved items only)</td><td>Oversees the stream nationally and nominates for funding</td></tr>
+<tr><td><code>ai</code></td><td>اللجنة الوطنية</td><td><code>ai_committee</code></td><td><strong>everything</strong> (approved items + nominations)</td><td>Reviews nominations and approves funding from the committee wallet</td></tr>
+<tr><td><code>admin</code></td><td>مشرف النظام</td><td><code>system_admin</code></td><td>global</td><td>Manages users, roles, assignments and audit logs</td></tr>
+</tbody></table>
+<p>Streams: العمليات والدعم المؤسسي (<code>ops</code>) · العمل الحكومي الاستراتيجي (<code>strategy</code>) · الخدمات (<code>services</code>) · بناء القدرات والتدريب (<code>capacity</code>) · تقنيات الذكاء الاصطناعي والبيانات (<code>tech</code>).</p>
+<p>Types per stream (enforced everywhere — menus, filters, KPIs, creation): مشروع/مبادرة in <strong>all</strong> streams · عملية only in <code>ops</code> + <code>strategy</code> · خدمة only in <code>services</code>.</p>
+<h2>3. Role by role</h2>
+<h3>3.1 منسق المسار في الجهة — <code>coord</code> / <code>entity_coordinator</code></h3>
+<p><strong>Who:</strong> the working-level user inside a federal entity, responsible for one stream — or several: when the account carries more than one row in <code>user_stream_scopes</code>, the header shows a <strong>stream switcher</strong> and the whole workspace (lists, dashboards, wizard) re-scopes to the selected stream. Appointed by their entity representative in team setup.</p>
+<p><strong>Pages (sidebar):</strong></p>
+<ul>
+<li>الرئيسية — stream dashboard (cost + inputs summaries, type cards)</li>
+<li>جميع الأنواع — the entry list, with sub-items only for the types the stream actually has (المشاريع والمبادرات، العمليات and/or الخدمات)</li>
+<li>مراحل التنفيذ — execution stages with «تخطيط المرحلة» (assign entries)</li>
+<li>خطة الإطلاق — scheduled launches + «إدارة الإطلاقات» (create/edit launches)</li>
+<li>دليل الاستخدام</li>
+</ul>
+<p>All entry lists carry a <strong>stages filter (المراحل)</strong> — the four stages plus «للتحديد بعد الدراسة»; the wizard can defer the stage decision with that same option, which shows as an amber chip on the card until a stage is assigned. Lists are ordered by stage (المرحلة الأولى first; unassigned/TBD last).</p>
+<p><strong>Can do:</strong> create entries (زر «إضافة مدخل جديد» + bulk upload), edit drafts, resubmit returned entries, submit for approval, plan stages and launches, update execution checklists, export reports.</p>
+<p><strong>Cannot:</strong> approve or reject anything; see other entities or other streams; see the funding basket. Drafts are visible <strong>only</strong> to the coordinator.</p>
+<h3>3.2 ممثل الجهة — <code>entity</code> / <code>entity_representative</code></h3>
+<p><strong>Who:</strong> the entity's official approver — one per entity, across all streams.</p>
+<p><strong>Pages (sidebar):</strong></p>
+<ul>
+<li>الرئيسية — entity dashboard (cost + inputs summaries, distribution by stream)</li>
+<li>جميع المسارات — drill-down by stream; entry list with filters (streams, types, statuses, funding state, search)</li>
+<li>مراحل التنفيذ / خطة الإطلاق — with a <strong>streams filter</strong>; launches show a «مسار …» chip on every launch and entry</li>
+<li>فريق العمل — registers the entity team (assigns its coordinators)</li>
+<li>دليل الاستخدام</li>
+</ul>
+<p><strong>Can do:</strong> <strong>اعتماد / رفض / طلب تفاصيل إضافية</strong> on submitted entries (the ent1 gate — the only role with this power), register the team, see all costs, export reports. Approve/reject permissions are granted server-side (<code>items:approve</code>, <code>items:reject</code>).</p>
+<p><strong>Cannot:</strong> see coordinator drafts; see other entities; nominate or fund.</p>
+<h3>3.3 رئيس المسار — <code>path</code> / <code>stream_owner</code></h3>
+<p><strong>Who:</strong> the national head of ONE stream, seeing that stream across <strong>all</strong> entities. Assigned by the system admin.</p>
+<p><strong>Pages (sidebar):</strong></p>
+<ul>
+<li>الرئيسية — stream dashboard (type cards for the stream's own types only)</li>
+<li>جميع الأنواع — entity-approved entries of the stream, with an <strong>entities filter</strong> (no streams filter — the stream is fixed)</li>
+<li>مراحل التنفيذ / خطة الإطلاق — with the entities filter; launches show the <strong>entity chip</strong> on every launch and entry; budgets hidden, status pills shown</li>
+<li>الجهات — one card per participating entity: entries broken down <strong>by type</strong> within his stream, plus «المدخلات المرشحة من قبلي» and «المدخلات المعتمدة للتمويل» with the approved cost</li>
+<li>سلة التمويل — the nomination basket</li>
+<li>دليل الاستخدام</li>
+</ul>
+<p><strong>Can do:</strong> <strong>ترشيح للتمويل</strong> (nominate approved entries to the committee), withdraw nominations, approve launch plans, export.</p>
+<p><strong>Cannot:</strong> see drafts or items awaiting entity approval; see other streams; approve funding; see money on the launch plan.</p>
+<h3>3.4 اللجنة الوطنية — <code>ai</code> / <code>ai_committee</code></h3>
+<p><strong>Who:</strong> the national committee controlling the approved budget (the wallet, default 100M AED).</p>
+<p><strong>Pages (sidebar):</strong></p>
+<ul>
+<li>الرئيسية — national dashboard (توزيع المدخلات حسب المسار, committee stats)</li>
+<li>المدخلات المرشحة للتمويل — the review list</li>
+<li>قائمة الاعتماد والتمويل — the funding basket with the wallet (approved/remaining budget)</li>
+<li>مراحل التنفيذ / خطة الإطلاق — with <strong>both</strong> entities and streams filters; launches show <strong>entity + stream chips</strong></li>
+<li>دليل الاستخدام</li>
+</ul>
+<p><strong>Can do:</strong> <strong>اعتماد التمويل / رفض الترشيح</strong> (with mandatory cancellation reason when withdrawing funding), adjust program-phase deadlines, run the AI reviewer, export.</p>
+<p><strong>Cannot:</strong> create or edit entries; act on items that were never nominated (the committee acts on <code>nominations</code>, not raw items).</p>
+<h3>3.5 مشرف النظام — <code>admin</code> / <code>system_admin</code></h3>
+<p><strong>Who:</strong> IT / platform administration. Bypasses permission checks server-side; every action is still audit-logged.</p>
+<p><strong>Pages:</strong> the admin console instead of the dashboards — plus a «لوحات المتابعة» button that opens <strong>all monitoring dashboards with the committee-wide scope</strong> (a «لوحة الإدارة» button returns to the console) —</p>
+<ul>
+<li>المستخدمون — create/edit/enable/disable users, bulk upload from the Excel template</li>
+<li>رؤساء المسارات واللجنة — assign the five stream heads and the committee</li>
+<li>الأدوار والصلاحيات — role reference</li>
+</ul>
+<p>In production the full management surface is the <strong>admin API suite</strong> (<code>/api/admin/users|roles|role-rules|entities|streams|audit-logs</code>), plus <code>BOOTSTRAP_ADMIN_EMAILS</code> for the very first sign-in.</p>
+<p><strong>Division of provisioning:</strong> the admin assigns stream heads + committee; each entity representative provisions their own coordinators via فريق العمل.</p>
+<h2>4. The workflow and who acts at each step</h2>
+<pre><code>
+(coord) create draft ──► submit ──► (entity rep) اعتماد ──► execution stages
+   ▲                                    │ رفض / طلب تفاصيل        │
+   └──── returned with notes ◄──────────┘                        ▼
+                                              (path head) ترشيح للتمويل
+                                                            │
+                                              (committee) اعتماد التمويل / رفض
+</code></pre>
+<ul>
+<li>Drafts (<code>wf = draft</code>): visible to the coordinator only.</li>
+<li>Awaiting approval (<code>ent1</code>): coordinator + entity representative.</li>
+<li>Approved onwards (<code>exec / launch / done</code>): also stream head and committee.</li>
+<li>Every server-side action lands in <code>log_entries</code> (business trail shown in السجل) <strong>and</strong> <code>audit_logs</code> (security trail with actor/IP/user-agent).</li>
+</ul>
+<h2>5. Backend permission matrix (seeded — <code>prisma/seed.ts</code>)</h2>
+<table><thead><tr><th>Permission</th><th>coord</th><th>entity rep</th><th>stream head</th><th>committee</th><th>admin</th></tr></thead><tbody>
+<tr><td>items:view / export</td><td>✔</td><td>✔</td><td>✔</td><td>✔</td><td>✔</td></tr>
+<tr><td>items:create / update / submit</td><td>✔</td><td>✔</td><td>—</td><td>—</td><td>✔</td></tr>
+<tr><td>items:approve / reject</td><td>—</td><td>✔</td><td>✔¹</td><td>✔¹</td><td>✔</td></tr>
+<tr><td>launch_plans:view</td><td>✔</td><td>✔</td><td>✔</td><td>✔</td><td>✔</td></tr>
+<tr><td>launch_plans:approve</td><td>—</td><td>—</td><td>✔</td><td>—</td><td>✔</td></tr>
+<tr><td>nominations:view</td><td>✔</td><td>✔</td><td>✔</td><td>✔</td><td>✔</td></tr>
+<tr><td>nominations:approve / reject</td><td>—</td><td>—</td><td>✔</td><td>—</td><td>✔</td></tr>
+<tr><td>funding:view</td><td>✔</td><td>✔</td><td>✔</td><td>✔</td><td>✔</td></tr>
+<tr><td>funding:approve / reject / cancel</td><td>—</td><td>—</td><td>—</td><td>✔</td><td>✔</td></tr>
+<tr><td>reports:view</td><td>✔</td><td>✔</td><td>✔</td><td>✔</td><td>✔</td></tr>
+<tr><td>reports:export</td><td>—</td><td>✔</td><td>—</td><td>✔</td><td>✔</td></tr>
+<tr><td>ai_review:run</td><td>—</td><td>—</td><td>—</td><td>✔</td><td>✔</td></tr>
+<tr><td>users / roles / audit / settings</td><td>—</td><td>—</td><td>—</td><td>—</td><td>✔</td></tr>
+</tbody></table>
+<p>¹ The permission exists for gates inside their own scope; in the UI flow the ent1 approval is performed by the entity representative.</p>
+<p><strong>Extra backend-only roles</strong> (no dedicated UI — they land on the closest read-only view):</p>
+<ul>
+<li><code>program_admin</code> (مدير البرنامج): everything except <code>settings:*</code>.</li>
+<li><code>entity_admin</code> (مسؤول الجهة): entity rep minus approve/reject, plus <code>entities:update</code>.</li>
+<li><code>viewer</code> (مستعرض): read-only within assigned scopes.</li>
+<li><code>auditor</code> (مدقق): read-only + <code>audit:view</code> + exports.</li>
+</ul>
+<h2>6. Where this is enforced in code</h2>
+<table><thead><tr><th>Concern</th><th>File</th></tr></thead><tbody>
+<tr><td>Permission + scope checks per request</td><td><code>lib/security/rbac.ts</code> (<code>assertPermission</code>, <code>assertItemAccess</code>)</td></tr>
+<tr><td>Session → user + roles + scopes</td><td><code>lib/security/auth.ts</code>, <code>/api/auth/me</code></td></tr>
+<tr><td>Role/permission/scope tables</td><td><code>prisma/schema.prisma</code> (migration <code>0009</code>)</td></tr>
+<tr><td>Seeded matrix + starter accounts</td><td><code>prisma/seed.ts</code></td></tr>
+<tr><td>Page/menu/filter scoping (UX)</td><td><code>lib/viewModel.ts</code></td></tr>
+<tr><td>Identity → user mapping on login</td><td><code>lib/security/user-access.ts</code></td></tr>
+</tbody></table>
+</div>
+</body>
+</html>

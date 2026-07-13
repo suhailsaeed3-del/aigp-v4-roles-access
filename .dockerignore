@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+.git
+.env
+.env*.local
+npm-debug.log*
+Dockerfile
+docker-compose.yml
+scratchpad
+project/uploads
+project/screenshots
+chats
+*.md
+!README.md

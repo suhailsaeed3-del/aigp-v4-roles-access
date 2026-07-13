@@ -1,0 +1,340 @@
+<meta charset="utf-8">
+<title>Architecture &amp; Data Flow</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; color: #1F2D49; font-size: 11px; line-height: 1.55; }
+  .page { width: 210mm; min-height: 297mm; padding: 18mm 16mm; page-break-after: always; position: relative; }
+  .page:last-child { page-break-after: auto; }
+  h1 { font-size: 26px; color: #0F1F3D; }
+  h2 { font-size: 16px; color: #0F1F3D; border-bottom: 2px solid #2563EB; padding-bottom: 5px; margin-bottom: 12px; }
+  h3 { font-size: 12.5px; color: #2563EB; margin: 12px 0 5px; }
+  p { margin-bottom: 7px; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+  th { background: #0F1F3D; color: #fff; font-size: 10px; padding: 5px 8px; text-align: left; }
+  td { border: 1px solid #DCE3EE; padding: 5px 8px; font-size: 10px; vertical-align: top; }
+  tr:nth-child(even) td { background: #F7F9FD; }
+  .ar { direction: rtl; font-weight: 600; }
+  .muted { color: #54627B; }
+  .tag { display: inline-block; background: #E5EEFF; color: #2563EB; border-radius: 4px; padding: 1px 6px; font-size: 9.5px; font-weight: 700; }
+  .cover { background: linear-gradient(160deg, #0F1F3D 0%, #1B3B7A 70%, #2563EB 130%); color: #fff; display: flex; flex-direction: column; justify-content: center; }
+  .cover h1 { color: #fff; font-size: 30px; margin-bottom: 6px; }
+  .cover .sub { font-size: 15px; color: #AFC6E8; margin-bottom: 26px; }
+  .cover .meta { font-size: 11px; color: #AFC6E8; border-top: 1px solid rgba(255,255,255,.25); padding-top: 14px; width: 60%; }
+  .foot { position: absolute; bottom: 9mm; left: 16mm; right: 16mm; display: flex; justify-content: space-between; font-size: 8.5px; color: #8A97AD; border-top: 1px solid #E7ECF4; padding-top: 4px; }
+  svg text { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; }
+  .caption { font-size: 9px; color: #8A97AD; text-align: center; margin-top: 3px; }
+</style>
+
+<div class="page cover">
+  <h1>AI Transformation Portal</h1>
+  <div class="sub">Architecture &amp; Data Flow — Technical Documentation</div>
+  <div class="sub" style="direction:rtl; text-align:left; font-size:13px;">المنصة الحكومية لتخطيط ومتابعة مشروع الذكاء الاصطناعي المساعد</div>
+  <div class="meta">
+    Document 1 of 2 · Prepared for the IT team (staging deployment, DB linking, go-live)<br>
+    Version 2.0 · July 2026 · Companion documents: docs/it-handover.md, .env.example, Roles &amp; Access (PDF)
+  </div>
+</div>
+
+<div class="page">
+  <h2>1. System overview</h2>
+  <p>The portal is a <b>Next.js 14</b> application (App Router, TypeScript, RTL Arabic UI) backed by
+  <b>PostgreSQL 16</b> through <b>Prisma ORM</b>. Users sign in with <b>UAE PASS</b> (OIDC); a server-side
+  <b>sessions</b> table backs the signed-in session. An optional internal, OpenAI-compatible model powers the AI
+  review step. One codebase serves all <b>five roles</b> — مشرف النظام (admin), ممثل الجهة, منسق المسار في الجهة,
+  رئيس المسار, and اللجنة الوطنية; every screen derives from a single role-scoped view-model, so what a user can
+  see is decided in one place. The <b>admin</b> gets a dedicated console for managing users &amp; roles and
+  assigning the stream heads and national committee.</p>
+  <svg viewBox="0 0 760 400" width="100%">
+    <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#54627B"/></marker></defs>
+    <rect x="20" y="30" width="200" height="120" rx="10" fill="#EAF0FE" stroke="#2563EB"/>
+    <text x="120" y="52" text-anchor="middle" font-size="12" font-weight="700" fill="#0F1F3D">Browser (client)</text>
+    <text x="120" y="72" text-anchor="middle" font-size="10" fill="#33415C">React UI · RTL · Cairo font</text>
+    <text x="120" y="88" text-anchor="middle" font-size="10" fill="#33415C">Zustand store + view-model</text>
+    <text x="120" y="104" text-anchor="middle" font-size="10" fill="#33415C">Excel/PPTX export (client-side)</text>
+    <text x="120" y="120" text-anchor="middle" font-size="10" fill="#33415C">Workplan .xlsx importer</text>
+    <rect x="300" y="20" width="220" height="180" rx="10" fill="#F4F7FC" stroke="#0F1F3D"/>
+    <text x="410" y="42" text-anchor="middle" font-size="12" font-weight="700" fill="#0F1F3D">Next.js server</text>
+    <rect x="315" y="55" width="190" height="28" rx="6" fill="#fff" stroke="#C7D1E2"/>
+    <text x="410" y="73" text-anchor="middle" font-size="10" fill="#33415C">/api/state — portfolio persistence</text>
+    <rect x="315" y="90" width="190" height="28" rx="6" fill="#fff" stroke="#C7D1E2"/>
+    <text x="410" y="108" text-anchor="middle" font-size="10" fill="#33415C">/api/ai-review — model proxy</text>
+    <rect x="315" y="125" width="190" height="28" rx="6" fill="#fff" stroke="#C7D1E2"/>
+    <text x="410" y="143" text-anchor="middle" font-size="10" fill="#33415C">/api/auth/uaepass/* — OIDC</text>
+    <rect x="315" y="160" width="190" height="28" rx="6" fill="#fff" stroke="#C7D1E2"/>
+    <text x="410" y="178" text-anchor="middle" font-size="10" fill="#33415C">Security headers · token guard</text>
+    <rect x="590" y="20" width="150" height="60" rx="10" fill="#E3F6EC" stroke="#0B8A4B"/>
+    <text x="665" y="45" text-anchor="middle" font-size="11" font-weight="700" fill="#0B8A4B">PostgreSQL 16</text>
+    <text x="665" y="62" text-anchor="middle" font-size="9.5" fill="#33415C">24 tables · Prisma</text>
+    <rect x="590" y="100" width="150" height="52" rx="10" fill="#FFF3DE" stroke="#B45309"/>
+    <text x="665" y="122" text-anchor="middle" font-size="11" font-weight="700" fill="#B45309">Internal AI model</text>
+    <text x="665" y="138" text-anchor="middle" font-size="9.5" fill="#33415C">OpenAI-compatible API</text>
+    <rect x="590" y="170" width="150" height="52" rx="10" fill="#FCEEEF" stroke="#C0303B"/>
+    <text x="665" y="192" text-anchor="middle" font-size="11" font-weight="700" fill="#C0303B">UAE PASS IdP</text>
+    <text x="665" y="208" text-anchor="middle" font-size="9.5" fill="#33415C">OIDC (staging/production)</text>
+    <line x1="220" y1="90" x2="298" y2="90" stroke="#54627B" stroke-width="1.5" marker-end="url(#a)"/>
+    <text x="259" y="82" text-anchor="middle" font-size="9" fill="#54627B">HTTPS</text>
+    <line x1="520" y1="60" x2="588" y2="50" stroke="#54627B" stroke-width="1.5" marker-end="url(#a)"/>
+    <line x1="520" y1="110" x2="588" y2="122" stroke="#54627B" stroke-width="1.5" marker-end="url(#a)"/>
+    <line x1="520" y1="150" x2="588" y2="190" stroke="#54627B" stroke-width="1.5" marker-end="url(#a)"/>
+    <rect x="20" y="230" width="720" height="140" rx="10" fill="#F7F9FD" stroke="#DCE3EE"/>
+    <text x="35" y="252" font-size="11" font-weight="700" fill="#0F1F3D">Two data modes</text>
+    <text x="35" y="274" font-size="10" fill="#33415C">• NEXT_PUBLIC_DATA_MODE=api (production): the browser persists through /api/state into PostgreSQL. Writes are</text>
+    <text x="47" y="289" font-size="10" fill="#33415C">guarded by a bearer token (STATE_API_TOKEN).</text>
+    <text x="35" y="311" font-size="10" fill="#33415C">• NEXT_PUBLIC_DATA_MODE=local (demo only): state stays in the browser (localStorage); the app can be exported as a</text>
+    <text x="47" y="326" font-size="10" fill="#33415C">static site. Not for production.</text>
+    <text x="35" y="352" font-size="10" fill="#33415C">If the AI endpoint is unset or unreachable, the review step degrades gracefully to a built-in heuristic reviewer.</text>
+  </svg>
+  <div class="caption">Fig. 1 — Runtime architecture</div>
+  <div class="foot"><span>AI Transformation Portal — Architecture &amp; Data Flow</span><span>2</span></div>
+</div>
+
+<div class="page">
+  <h2>2. Deployment architecture (Kubernetes)</h2>
+  <p>Manifests are provided in <b>k8s/</b>. The application image is built from the repository <b>Dockerfile</b>;
+  database schema changes run as a one-shot migration <b>Job</b> before each rollout.</p>
+  <svg viewBox="0 0 760 360" width="100%">
+    <defs><marker id="b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#54627B"/></marker></defs>
+    <rect x="20" y="150" width="90" height="46" rx="10" fill="#EAF0FE" stroke="#2563EB"/>
+    <text x="65" y="177" text-anchor="middle" font-size="11" font-weight="700" fill="#0F1F3D">Users</text>
+    <rect x="150" y="30" width="590" height="250" rx="12" fill="none" stroke="#0F1F3D" stroke-dasharray="6 4"/>
+    <text x="170" y="52" font-size="11" font-weight="700" fill="#0F1F3D">Kubernetes cluster — namespace: aitp</text>
+    <rect x="175" y="140" width="120" height="60" rx="10" fill="#F4F7FC" stroke="#0F1F3D"/>
+    <text x="235" y="165" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0F1F3D">Ingress (TLS)</text>
+    <text x="235" y="182" text-anchor="middle" font-size="9" fill="#54627B">WAF / rate-limit</text>
+    <rect x="335" y="140" width="110" height="60" rx="10" fill="#F4F7FC" stroke="#0F1F3D"/>
+    <text x="390" y="165" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0F1F3D">Service</text>
+    <text x="390" y="182" text-anchor="middle" font-size="9" fill="#54627B">port 80 → 3000</text>
+    <rect x="485" y="90" width="130" height="52" rx="10" fill="#EAF0FE" stroke="#2563EB"/>
+    <text x="550" y="112" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0F1F3D">Portal pod ×2</text>
+    <text x="550" y="128" text-anchor="middle" font-size="9" fill="#54627B">non-root · probes · limits</text>
+    <rect x="485" y="160" width="130" height="46" rx="10" fill="#FFF3DE" stroke="#B45309"/>
+    <text x="550" y="180" text-anchor="middle" font-size="10.5" font-weight="700" fill="#B45309">Migrate Job</text>
+    <text x="550" y="196" text-anchor="middle" font-size="9" fill="#54627B">prisma migrate + seed</text>
+    <rect x="485" y="222" width="130" height="46" rx="10" fill="#F4F7FC" stroke="#0F1F3D"/>
+    <text x="550" y="242" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0F1F3D">ConfigMap · Secret</text>
+    <text x="550" y="258" text-anchor="middle" font-size="9" fill="#54627B">env + credentials</text>
+    <rect x="640" y="300" width="100" height="0" fill="none"/>
+    <rect x="330" y="300" width="180" height="46" rx="10" fill="#E3F6EC" stroke="#0B8A4B"/>
+    <text x="420" y="320" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0B8A4B">Managed PostgreSQL 16</text>
+    <text x="420" y="336" text-anchor="middle" font-size="9" fill="#54627B">backups · PITR</text>
+    <line x1="110" y1="172" x2="173" y2="172" stroke="#54627B" stroke-width="1.5" marker-end="url(#b)"/>
+    <line x1="295" y1="172" x2="333" y2="172" stroke="#54627B" stroke-width="1.5" marker-end="url(#b)"/>
+    <line x1="445" y1="160" x2="483" y2="125" stroke="#54627B" stroke-width="1.5" marker-end="url(#b)"/>
+    <line x1="550" y1="142" x2="550" y2="158" stroke="#C7D1E2" stroke-width="1.2"/>
+    <line x1="550" y1="206" x2="550" y2="220" stroke="#C7D1E2" stroke-width="1.2"/>
+    <line x1="540" y1="142" x2="440" y2="298" stroke="#54627B" stroke-width="1.5" marker-end="url(#b)"/>
+    <line x1="560" y1="206" x2="470" y2="298" stroke="#54627B" stroke-width="1.5" marker-end="url(#b)"/>
+  </svg>
+  <div class="caption">Fig. 2 — Kubernetes deployment (k8s/ manifests)</div>
+  <h3>Release flow</h3>
+  <table>
+    <tr><th>#</th><th>Step</th><th>Command / artifact</th></tr>
+    <tr><td>1</td><td>Build &amp; push image</td><td>docker build -t REGISTRY/aitp-portal:TAG .</td></tr>
+    <tr><td>2</td><td>Apply namespace, config, secret</td><td>k8s/namespace.yaml · configmap.yaml · secret (from secret.example.yaml)</td></tr>
+    <tr><td>3</td><td>Migrate + seed reference data</td><td>k8s/migrate-job.yaml (idempotent)</td></tr>
+    <tr><td>4</td><td>Roll application</td><td>k8s/deployment.yaml · service.yaml · ingress.yaml</td></tr>
+  </table>
+  <div class="foot"><span>AI Transformation Portal — Architecture &amp; Data Flow</span><span>3</span></div>
+</div>
+
+<div class="page">
+  <h2>3. Data model</h2>
+  <p>Schema source of truth: <b>prisma/schema.prisma</b> + migrations <b>0001–0008</b> (verified on a fresh
+  PostgreSQL 16 — 24 tables). The seed loads <b>reference data + roles + starter accounts</b>; items, launch plans
+  and all transaction tables start empty (the demo portfolio only seeds when <code>NEXT_PUBLIC_DEMO_DATA=1</code>).</p>
+  <table>
+    <tr><th>Group</th><th>Tables</th><th>Notes</th></tr>
+    <tr><td><b>Reference</b></td><td>streams, entities, program_phases, exec_batches, settings</td>
+        <td>5 streams in official order with the predefined heads (رؤساء المسارات); 35 federal entities; المراحل; approved committee budget (100M AED).</td></tr>
+    <tr><td><b>Access control</b></td><td>roles, users, sessions</td>
+        <td><b>roles</b> holds the 5 roles (admin | coord | entity | path | ai) with a permissions JSON; <b>users.role</b> is a FK into it. Seed creates starter accounts (admin, committee, 5 stream heads, entity rep, 5 coordinators) keyed by @aigp.gov.ae emails IT re-points to UAE PASS identities. <b>sessions</b> backs each signed-in session.</td></tr>
+    <tr><td><b>Team setup</b></td><td>entity_reps, stream_owners</td>
+        <td>Per-entity representative and per-stream owners; the entity rep provisions its own coordinators here.</td></tr>
+    <tr><td><b>Portfolio</b></td><td>items, item_launch_plans, launch_plans, launches, item_launches, exec_checklist_items, sub_milestones</td>
+        <td>Items carry the <b>execution budget</b>; a launch plan's execution budget is <b>derived</b> (sum of attached items) and its <b>launch_budget</b> is informational only.</td></tr>
+    <tr><td><b>Workflow / audit</b></td><td>log_entries, nominations, fundings, funding_cancellations, notifications</td>
+        <td>Every action is logged with actor + timestamp; nominations and funding decisions are first-class rows. <b>notifications</b> persist الإشعارات (per-user or role/entity/stream broadcast) for optional email/SMS push.</td></tr>
+    <tr><td><b>Misc</b></td><td>app_state</td><td>Serialized UI-state snapshot used by /api/state.</td></tr>
+  </table>
+  <h3>Cost model (important)</h3>
+  <svg viewBox="0 0 760 190" width="100%">
+    <defs><marker id="c" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#54627B"/></marker></defs>
+    <rect x="20" y="25" width="180" height="52" rx="10" fill="#EAF0FE" stroke="#2563EB"/>
+    <text x="110" y="47" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0F1F3D">Item — execution budget</text>
+    <text x="110" y="64" text-anchor="middle" font-size="9" fill="#54627B">entered at creation (step 4)</text>
+    <rect x="20" y="95" width="180" height="52" rx="10" fill="#EAF0FE" stroke="#2563EB"/>
+    <text x="110" y="117" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0F1F3D">Item — execution budget</text>
+    <text x="110" y="134" text-anchor="middle" font-size="9" fill="#54627B">…one per attached item</text>
+    <rect x="290" y="55" width="200" height="66" rx="10" fill="#F4F7FC" stroke="#0F1F3D"/>
+    <text x="390" y="78" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0F1F3D">Launch plan</text>
+    <text x="390" y="95" text-anchor="middle" font-size="9.5" fill="#33415C">execution budget = Σ items (derived)</text>
+    <text x="390" y="110" text-anchor="middle" font-size="9.5" fill="#33415C">launch_budget = manual, informational</text>
+    <rect x="570" y="25" width="170" height="52" rx="10" fill="#E3F6EC" stroke="#0B8A4B"/>
+    <text x="655" y="47" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0B8A4B">Committee totals</text>
+    <text x="655" y="64" text-anchor="middle" font-size="9" fill="#54627B">count execution money only</text>
+    <rect x="570" y="95" width="170" height="52" rx="10" fill="#FFF3DE" stroke="#B45309"/>
+    <text x="655" y="117" text-anchor="middle" font-size="10.5" font-weight="700" fill="#B45309">Entity rep awareness</text>
+    <text x="655" y="134" text-anchor="middle" font-size="9" fill="#54627B">sees launch totals too</text>
+    <line x1="200" y1="51" x2="288" y2="75" stroke="#54627B" stroke-width="1.5" marker-end="url(#c)"/>
+    <line x1="200" y1="121" x2="288" y2="100" stroke="#54627B" stroke-width="1.5" marker-end="url(#c)"/>
+    <line x1="490" y1="70" x2="568" y2="53" stroke="#54627B" stroke-width="1.5" marker-end="url(#c)"/>
+    <line x1="490" y1="108" x2="568" y2="120" stroke="#54627B" stroke-width="1.5" marker-end="url(#c)"/>
+  </svg>
+  <div class="caption">Fig. 3 — Cost derivation: items feed plans; funding counts execution money only</div>
+  <div class="foot"><span>AI Transformation Portal — Architecture &amp; Data Flow</span><span>4</span></div>
+</div>
+
+<div class="page">
+  <h2>4. Data flow — sign-in (UAE PASS OIDC)</h2>
+  <svg viewBox="0 0 760 250" width="100%">
+    <defs><marker id="d" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#54627B"/></marker></defs>
+    <g font-size="10.5" font-weight="700" fill="#0F1F3D">
+      <text x="80" y="28" text-anchor="middle">Browser</text>
+      <text x="330" y="28" text-anchor="middle">Portal (/api/auth/uaepass)</text>
+      <text x="580" y="28" text-anchor="middle">UAE PASS IdP</text>
+    </g>
+    <line x1="80" y1="36" x2="80" y2="235" stroke="#C7D1E2"/>
+    <line x1="330" y1="36" x2="330" y2="235" stroke="#C7D1E2"/>
+    <line x1="580" y1="36" x2="580" y2="235" stroke="#C7D1E2"/>
+    <line x1="80" y1="55" x2="328" y2="55" stroke="#54627B" stroke-width="1.4" marker-end="url(#d)"/>
+    <text x="204" y="48" text-anchor="middle" font-size="9.5" fill="#33415C">1. click "Sign in with UAE PASS"</text>
+    <line x1="330" y1="85" x2="578" y2="85" stroke="#54627B" stroke-width="1.4" marker-end="url(#d)"/>
+    <text x="455" y="78" text-anchor="middle" font-size="9.5" fill="#33415C">2. redirect: authorize (client_id, state, nonce)</text>
+    <line x1="580" y1="115" x2="332" y2="115" stroke="#54627B" stroke-width="1.4" marker-end="url(#d)"/>
+    <text x="455" y="108" text-anchor="middle" font-size="9.5" fill="#33415C">3. callback with authorization code</text>
+    <line x1="330" y1="145" x2="578" y2="145" stroke="#54627B" stroke-width="1.4" marker-end="url(#d)"/>
+    <text x="455" y="138" text-anchor="middle" font-size="9.5" fill="#33415C">4. token exchange (server-side, client_secret)</text>
+    <line x1="330" y1="175" x2="82" y2="175" stroke="#54627B" stroke-width="1.4" marker-end="url(#d)"/>
+    <text x="204" y="168" text-anchor="middle" font-size="9.5" fill="#33415C">5. sessions row + cookie → dashboard (role-scoped)</text>
+    <rect x="40" y="195" width="680" height="34" rx="8" fill="#FFF8EC" stroke="#F6E2BD"/>
+    <text x="380" y="216" text-anchor="middle" font-size="9.5" fill="#8A6314">To wire (IT): after step 4, resolve the user in users (email / Emirates ID) → join roles → write a sessions row (token cookie, SESSION_SECRET, expiry) → role, stream, entity in the session. Mock mode skips 2–4.</text>
+  </svg>
+  <div class="caption">Fig. 4 — Authentication sequence</div>
+
+  <h2 style="margin-top:16px;">5. Data flow — item lifecycle</h2>
+  <svg viewBox="0 0 760 240" width="100%">
+    <defs><marker id="e" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#54627B"/></marker></defs>
+    <rect x="20" y="30" width="120" height="46" rx="22" fill="#EEF1F6" stroke="#64748B"/>
+    <text x="80" y="50" text-anchor="middle" font-size="10" font-weight="700" fill="#33415C">مسودة</text>
+    <text x="80" y="65" text-anchor="middle" font-size="8.5" fill="#54627B">draft (coordinator)</text>
+    <rect x="200" y="30" width="160" height="46" rx="22" fill="#FFF3DE" stroke="#B45309"/>
+    <text x="280" y="50" text-anchor="middle" font-size="10" font-weight="700" fill="#B45309">بانتظار اعتماد ممثل الجهة</text>
+    <text x="280" y="65" text-anchor="middle" font-size="8.5" fill="#54627B">pending entity approval</text>
+    <rect x="420" y="30" width="160" height="46" rx="22" fill="#EAF0FE" stroke="#2563EB"/>
+    <text x="500" y="50" text-anchor="middle" font-size="10" font-weight="700" fill="#2563EB">مخطط · المرحلة ١…٤</text>
+    <text x="500" y="65" text-anchor="middle" font-size="8.5" fill="#54627B">planned in a batch</text>
+    <rect x="620" y="30" width="120" height="46" rx="22" fill="#E3F6EC" stroke="#0B8A4B"/>
+    <text x="680" y="50" text-anchor="middle" font-size="10" font-weight="700" fill="#0B8A4B">مكتمل</text>
+    <text x="680" y="65" text-anchor="middle" font-size="8.5" fill="#54627B">launched</text>
+    <line x1="140" y1="53" x2="198" y2="53" stroke="#54627B" stroke-width="1.5" marker-end="url(#e)"/>
+    <text x="169" y="46" text-anchor="middle" font-size="8.5" fill="#54627B">submit</text>
+    <line x1="360" y1="53" x2="418" y2="53" stroke="#54627B" stroke-width="1.5" marker-end="url(#e)"/>
+    <text x="389" y="46" text-anchor="middle" font-size="8.5" fill="#54627B">approve</text>
+    <line x1="580" y1="53" x2="618" y2="53" stroke="#54627B" stroke-width="1.5" marker-end="url(#e)"/>
+    <text x="599" y="24" text-anchor="middle" font-size="8.5" fill="#54627B">all launches done</text>
+    <path d="M 280 76 Q 280 104 180 104 Q 80 104 80 78" fill="none" stroke="#C0303B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#e)"/>
+    <text x="255" y="122" text-anchor="middle" font-size="8.5" fill="#C0303B">return with notes (بحاجة إلى تعديل) — or the coordinator withdraws &amp; deletes</text>
+    <rect x="20" y="135" width="720" height="90" rx="10" fill="#F7F9FD" stroke="#DCE3EE"/>
+    <text x="35" y="155" font-size="10" font-weight="700" fill="#0F1F3D">Parallel funding track (after entity approval)</text>
+    <text x="35" y="175" font-size="9.5" fill="#33415C">رئيس المسار nominates (ترشيح للتمويل) → اللجنة الوطنية funds against the 100M budget → funding can be cancelled with a reason.</text>
+    <text x="35" y="192" font-size="9.5" fill="#33415C">Nominations are visible only to رئيس المسار and the committee; entities see the funding outcome (معتمد للتمويل).</text>
+    <text x="35" y="209" font-size="9.5" fill="#33415C">Every transition writes a log entry (actor, action, timestamp) — the item's audit trail in the detail page.</text>
+  </svg>
+  <div class="caption">Fig. 5 — Lifecycle state machine + funding track</div>
+  <div class="foot"><span>AI Transformation Portal — Architecture &amp; Data Flow</span><span>5</span></div>
+</div>
+
+<div class="page">
+  <h2>6. Data flow — bulk import (workplan file)</h2>
+  <p>The coordinator uploads the <b>official خطة العمل Excel export</b> that entities already produce (the same file
+  from the existing workplan system). The importer reads every sheet and maps the legacy vocabulary automatically.</p>
+  <svg viewBox="0 0 760 300" width="100%">
+    <defs><marker id="f" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#54627B"/></marker></defs>
+    <rect x="20" y="30" width="150" height="56" rx="10" fill="#EAF0FE" stroke="#2563EB"/>
+    <text x="95" y="53" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0F1F3D">.xlsx upload</text>
+    <text x="95" y="70" text-anchor="middle" font-size="9" fill="#54627B">official workplan export</text>
+    <rect x="230" y="20" width="220" height="150" rx="10" fill="#F4F7FC" stroke="#0F1F3D"/>
+    <text x="340" y="42" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0F1F3D">Parser (lib/workplan.ts)</text>
+    <text x="340" y="62" text-anchor="middle" font-size="9" fill="#33415C">sheet 1 → track (types section-4 rows)</text>
+    <text x="340" y="79" text-anchor="middle" font-size="9" fill="#33415C">المشاريع القائمة/الجديدة → projects</text>
+    <text x="340" y="96" text-anchor="middle" font-size="9" fill="#33415C">القسم ٤ → operations/services (19 cols)</text>
+    <text x="340" y="113" text-anchor="middle" font-size="9" fill="#33415C">البرنامج الزمني → date→مرحلة mapping</text>
+    <text x="340" y="130" text-anchor="middle" font-size="9" fill="#33415C">الإطلاقات → launch plans</text>
+    <text x="340" y="147" text-anchor="middle" font-size="9" fill="#33415C">legacy wording normalized (الدفعة→المرحلة)</text>
+    <rect x="510" y="30" width="230" height="56" rx="10" fill="#FFF8EC" stroke="#F6E2BD"/>
+    <text x="625" y="53" text-anchor="middle" font-size="10.5" font-weight="700" fill="#8A6314">Review screen</text>
+    <text x="625" y="70" text-anchor="middle" font-size="9" fill="#54627B">AI/heuristic readiness verdict per row</text>
+    <rect x="510" y="120" width="230" height="56" rx="10" fill="#E3F6EC" stroke="#0B8A4B"/>
+    <text x="625" y="142" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0B8A4B">Items + launch plans created</text>
+    <text x="625" y="159" text-anchor="middle" font-size="9" fill="#54627B">rows with errors are skipped</text>
+    <line x1="170" y1="58" x2="228" y2="58" stroke="#54627B" stroke-width="1.5" marker-end="url(#f)"/>
+    <line x1="450" y1="58" x2="508" y2="58" stroke="#54627B" stroke-width="1.5" marker-end="url(#f)"/>
+    <line x1="625" y1="86" x2="625" y2="118" stroke="#54627B" stroke-width="1.5" marker-end="url(#f)"/>
+    <text x="637" y="106" font-size="8.5" fill="#54627B">submit</text>
+    <rect x="20" y="200" width="720" height="80" rx="10" fill="#F7F9FD" stroke="#DCE3EE"/>
+    <text x="35" y="220" font-size="10" font-weight="700" fill="#0F1F3D">Mapping guarantees</text>
+    <text x="35" y="238" font-size="9.5" fill="#33415C">• Whatever the file does not carry stays blank for manual completion on the website (nothing is invented).</text>
+    <text x="35" y="255" font-size="9.5" fill="#33415C">• Launches are placed into المرحلة ١…٤ by date using the file's own timeline; legacy batches ٥/٦/التحسين fold into المرحلة الرابعة.</text>
+    <text x="35" y="272" font-size="9.5" fill="#33415C">• Old column titles (الإدارة المعنية…) and the new wording (الوحدة التنظيمية…) are both accepted.</text>
+  </svg>
+  <div class="caption">Fig. 6 — Bulk import pipeline</div>
+
+  <h2 style="margin-top:14px;">7. Data flow — persistence &amp; exports</h2>
+  <table>
+    <tr><th>Flow</th><th>Path</th><th>Notes</th></tr>
+    <tr><td>State write</td><td>UI action → store → POST /api/state → PostgreSQL</td><td>Bearer-token guarded; every workflow action also appends a log entry.</td></tr>
+    <tr><td>State read</td><td>App load → GET /api/state → store hydrate</td><td>Role scoping is applied in the view-model on every render.</td></tr>
+    <tr><td>AI review</td><td>UI → POST /api/ai-review → internal model</td><td>Server-side proxy; heuristic fallback if the model is unavailable.</td></tr>
+    <tr><td>Excel / PowerPoint export</td><td>Client-side generation (exceljs / pptxgenjs)</td><td>Exports the current role-scoped list only — a user can never export data they cannot see.</td></tr>
+  </table>
+  <div class="foot"><span>AI Transformation Portal — Architecture &amp; Data Flow</span><span>6</span></div>
+</div>
+
+<div class="page">
+  <h2>8. Access provisioning &amp; the admin console</h2>
+  <p>Accounts live in <b>users</b> (FK <b>users.role → roles.key</b>). Two actors provision people, and the split
+  is enforced by role: the <b>admin</b> owns platform-level identities (stream heads and the national committee),
+  while each <b>entity rep</b> owns the coordinators inside its own entity.</p>
+  <svg viewBox="0 0 760 300" width="100%">
+    <defs><marker id="g" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#54627B"/></marker></defs>
+    <rect x="300" y="20" width="160" height="54" rx="10" fill="#FDF0DC" stroke="#B45309"/>
+    <text x="380" y="42" text-anchor="middle" font-size="11" font-weight="700" fill="#B45309">مشرف النظام</text>
+    <text x="380" y="60" text-anchor="middle" font-size="9" fill="#54627B">admin · admin console</text>
+    <rect x="60" y="120" width="200" height="60" rx="10" fill="#DEF4F6" stroke="#0E7C86"/>
+    <text x="160" y="143" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0E7C86">رؤساء المسارات ×5</text>
+    <text x="160" y="161" text-anchor="middle" font-size="9" fill="#54627B">role=path · one per stream</text>
+    <rect x="500" y="120" width="200" height="60" rx="10" fill="#EFEAFE" stroke="#6D28D9"/>
+    <text x="600" y="143" text-anchor="middle" font-size="10.5" font-weight="700" fill="#6D28D9">اللجنة الوطنية</text>
+    <text x="600" y="161" text-anchor="middle" font-size="9" fill="#54627B">role=ai · committee members</text>
+    <rect x="300" y="120" width="160" height="60" rx="10" fill="#E5EEFF" stroke="#2563EB"/>
+    <text x="380" y="143" text-anchor="middle" font-size="10.5" font-weight="700" fill="#2563EB">ممثل الجهة</text>
+    <text x="380" y="161" text-anchor="middle" font-size="9" fill="#54627B">role=entity · per entity</text>
+    <rect x="300" y="220" width="160" height="58" rx="10" fill="#DCF3F5" stroke="#0E7C86"/>
+    <text x="380" y="243" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0E7C86">منسقو المسارات</text>
+    <text x="380" y="261" text-anchor="middle" font-size="9" fill="#54627B">role=coord · entity+stream</text>
+    <line x1="340" y1="74" x2="180" y2="118" stroke="#B45309" stroke-width="1.5" marker-end="url(#g)"/>
+    <text x="215" y="98" text-anchor="middle" font-size="8.5" fill="#B45309">assigns / تعيين</text>
+    <line x1="420" y1="74" x2="590" y2="118" stroke="#B45309" stroke-width="1.5" marker-end="url(#g)"/>
+    <text x="545" y="98" text-anchor="middle" font-size="8.5" fill="#B45309">assigns / إضافة عضو</text>
+    <line x1="380" y1="74" x2="380" y2="118" stroke="#54627B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#g)"/>
+    <text x="452" y="98" text-anchor="middle" font-size="8.5" fill="#54627B">creates entity accounts</text>
+    <line x1="380" y1="180" x2="380" y2="218" stroke="#2563EB" stroke-width="1.5" marker-end="url(#g)"/>
+    <text x="470" y="203" text-anchor="middle" font-size="8.5" fill="#2563EB">provisions in team setup</text>
+  </svg>
+  <div class="caption">Fig. 7 — Who provisions whom (admin console vs. entity team setup)</div>
+
+  <h3>Roles &amp; capabilities (roles.permissions)</h3>
+  <table>
+    <tr><th>role</th><th class="ar">الدور</th><th>scope</th><th>Key capabilities</th></tr>
+    <tr><td><b>admin</b></td><td class="ar">مشرف النظام</td><td>system</td><td>users.manage · roles.view · streamhead.assign · committee.assign</td></tr>
+    <tr><td><b>ai</b></td><td class="ar">اللجنة الوطنية</td><td>national</td><td>item.view.all · nomination.review · funding.approve · funding.cancel · phase.edit · budget.set</td></tr>
+    <tr><td><b>path</b></td><td class="ar">رئيس المسار</td><td>stream</td><td>item.view.stream · item.nominate · plan.view</td></tr>
+    <tr><td><b>entity</b></td><td class="ar">ممثل الجهة</td><td>entity</td><td>item.view.entity · item.approve · item.return · team.manage</td></tr>
+    <tr><td><b>coord</b></td><td class="ar">منسق المسار في الجهة</td><td>entity+stream</td><td>item.create · item.update · item.submit · plan.edit</td></tr>
+  </table>
+  <p class="muted" style="margin-top:8px;">Provisioning rules enforced by the app: <b>coord</b> and <b>entity</b> require <code>entity_id</code>;
+  <b>coord</b> and <b>path</b> require <code>stream_id</code>; <b>ai</b> and <b>admin</b> require neither. Deactivate
+  (never delete) accounts via <code>is_active=false</code> so the audit trail keeps valid author names.</p>
+  <div class="foot"><span>AI Transformation Portal — Architecture &amp; Data Flow</span><span>7</span></div>
+</div>

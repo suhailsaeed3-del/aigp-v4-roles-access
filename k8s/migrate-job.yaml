@@ -1,0 +1,19 @@
+# Run once per release BEFORE rolling the app deployment:
+#   kubectl -n aitp delete job aitp-migrate --ignore-not-found && kubectl apply -f k8s/migrate-job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: aitp-migrate
+  namespace: aitp
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: REGISTRY/aitp-portal:latest # same image as the app
+          command: ["sh", "-c", "npx prisma migrate deploy && npx tsx prisma/seed.ts"]
+          envFrom:
+            - configMapRef: { name: aitp-config }
+            - secretRef: { name: aitp-secrets }

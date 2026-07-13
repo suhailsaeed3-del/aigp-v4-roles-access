@@ -1,0 +1,597 @@
+// ============================================================================
+// AI Transformation Portal — relational schema (Postgres)
+// Properly normalized tables for the production deployment. The static demo
+// runs on localStorage; the Docker/server deployment uses these tables.
+// Naming: camelCase in the client, snake_case tables/columns via @map.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Reference data
+// ---------------------------------------------------------------------------
+
+/// Government entity (الجهة) — the 34 federal entities + the session entity.
+model Entity {
+  id        String   @id @default(cuid())
+  nameAr    String   @unique @map("name_ar")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  items        Item[]
+  reps         EntityRep[]
+  streamOwners StreamOwner[]
+  users        User[]
+  userScopes   UserEntityScope[]
+
+  @@map("entities")
+}
+
+/// Transformation stream (المسار) — 5 predefined; head = رئيس المسار.
+model Stream {
+  id        String  @id // capacity | tech | ops | strategy | services
+  nameAr    String  @unique @map("name_ar")
+  descAr    String  @map("desc_ar")
+  headName  String? @map("head_name")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  items        Item[]
+  streamOwners StreamOwner[]
+  users        User[]
+  userScopes   UserStreamScope[]
+
+  @@map("streams")
+}
+
+/// Program phase (مراحل البرنامج) with its deadline — editable by the committee.
+model ProgramPhase {
+  idx      Int    @id
+  nameAr   String @map("name_ar")
+  descAr   String @map("desc_ar")
+  deadline String // ISO date
+
+  @@map("program_phases")
+}
+
+/// Execution batch (الدفعات الربعية) — the 5 fixed quarterly milestones.
+model ExecBatch {
+  id       Int    @id
+  nameAr   String @unique @map("name_ar")
+  periodAr String @map("period_ar")
+  descAr   String @map("desc_ar")
+  startsOn String @map("starts_on") // ISO date
+  endsOn   String @map("ends_on") // ISO date
+
+  @@map("exec_batches")
+}
+
+/// Key-value app settings (e.g. approved committee budget).
+model Setting {
+  key   String @id
+  value String
+
+  @@map("settings")
+}
+
+// ---------------------------------------------------------------------------
+// Team setup (تسجيل فريق العمل) — per entity
+// ---------------------------------------------------------------------------
+
+/// Official entity representative (ممثل الجهة).
+model EntityRep {
+  id       String @id @default(cuid())
+  entityId String @map("entity_id")
+  name     String
+  position String @default("")
+  email    String @default("")
+  phone    String @default("")
+
+  entity Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@unique([entityId])
+  @@map("entity_reps")
+}
+
+/// Per-stream owner inside an entity (مسؤول المسار في الجهة).
+model StreamOwner {
+  id       String  @id @default(cuid())
+  entityId String  @map("entity_id")
+  streamId String  @map("stream_id")
+  name     String  @default("")
+  position String  @default("")
+  email    String  @default("")
+  phone    String  @default("")
+  isSelf   Boolean @default(false) @map("is_self")
+
+  entity Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  stream Stream @relation(fields: [streamId], references: [id], onDelete: Cascade)
+
+  @@unique([entityId, streamId])
+  @@map("stream_owners")
+}
+
+// ---------------------------------------------------------------------------
+// Items (العناصر) + child tables
+// ---------------------------------------------------------------------------
+
+enum WfState {
+  draft
+  ent1
+  pm1
+  pm2
+  ent2
+  budget
+  exec
+  launch
+  done
+
+  @@map("wf_state")
+}
+
+enum ItemType {
+  project
+  initiative
+  operation
+  service
+
+  @@map("item_type")
+}
+
+model Item {
+  id       String   @id
+  type     ItemType
+  streamId String   @map("stream_id")
+  entityId String   @map("entity_id")
+  title    String
+  desc     String   @default("")
+  wf       WfState  @default(draft)
+  approval String   @default("مسودة")
+
+  // assessment
+  priority          String?
+  rank              Int?
+  complexity        String?
+  impact            String?
+  status            String?
+  transformability  String?
+  readiness         String?
+  usageIntensity    String? @map("usage_intensity")
+  transformPriority String? @map("transform_priority")
+  automationPct     Int?    @map("automation_pct")
+  automationLevel   String? @map("automation_level")
+  automationSystem  String? @map("automation_system")
+  complexityLevel   String? @map("complexity_level")
+  progress          Int     @default(0)
+
+  // outcomes / scope
+  scopeOfWork      String? @map("scope_of_work")
+  budget           String?
+  budgetAmount     BigInt? @map("budget_amount") // parsed درهم amount
+  scopeApproval    String? @map("scope_approval")
+  scopeFile        String? @map("scope_file")
+  expectedOutputs  String? @map("expected_outputs")
+  expectedOutcomes String? @map("expected_outcomes")
+  expectedImpact   String? @map("expected_impact")
+  aiModels         Int?    @map("ai_models")
+  targetPct        Int?    @map("target_pct")
+  endDate          String? @map("end_date")
+
+  // operation-specific
+  opType        String? @map("op_type")
+  subActivities String? @map("sub_activities")
+  sector        String?
+  dept          String?
+  section       String?
+
+  // service-specific
+  serviceOwner        String? @map("service_owner")
+  targetUsers         String? @map("target_users")
+  currentJourney      String? @map("current_journey")
+  painPoints          String? @map("pain_points")
+  expectedImprovement String? @map("expected_improvement")
+
+  // execution planning
+  execBatch       String?          @map("exec_batch") // FK by name into exec_batches.name_ar (kept loose for flexibility)
+  // centrally-managed launch plans the item is attached to (إدارة خطط الإطلاق)
+  // — one batch per item, but potentially several launches within that batch
+  launchPlanLinks ItemLaunchPlan[]
+
+  // returned-with-notes state (ملاحظات ممثل الجهة)
+  retType String? @map("ret_type") // info | reject
+  retFrom String? @map("ret_from")
+  retNote String? @map("ret_note")
+
+  // stage-move marker (نُقل بين المراحل) — set when the item is moved to a
+  // different execution stage; every stakeholder is notified of the move
+  stageMoveFrom String?   @map("stage_move_from")
+  stageMoveTo   String?   @map("stage_move_to")
+  stageMoveAt   DateTime? @map("stage_move_at")
+  stageMoveBy   String?   @map("stage_move_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  entity Entity @relation(fields: [entityId], references: [id])
+  stream Stream @relation(fields: [streamId], references: [id])
+
+  checklist     ExecChecklistItem[]
+  subMilestones SubMilestone[]
+  launches      ItemLaunch[]
+  logs          LogEntry[]
+  nomination    Nomination?
+  funding       Funding?
+  fundingCancel FundingCancellation?
+
+  @@index([entityId])
+  @@index([streamId])
+  @@index([wf])
+  @@map("items")
+}
+
+/// Centrally managed launch plans (إدارة خطط الإطلاق) — one per launch event,
+/// defined per execution batch; may carry the group-level scope and budget
+/// for the set of operations / services / projects launched together.
+model LaunchPlan {
+  id           String  @id
+  batch        String // batch name (loose FK into exec_batches.name_ar)
+  title        String
+  ltype        String  @default("")
+  date         String  @default("")
+  desc         String  @default("")
+  scope        String  @default("")
+  budget       String  @default("")
+  budgetAmount BigInt? @map("budget_amount") // parsed درهم amount (execution — funding totals)
+  launchBudget String  @default("") @map("launch_budget") // launch/event cost, informational
+
+  itemLinks ItemLaunchPlan[]
+
+  @@index([batch])
+  @@map("launch_plans")
+}
+
+/// Join: which items participate in which managed launch plan.
+model ItemLaunchPlan {
+  itemId       String @map("item_id")
+  launchPlanId String @map("launch_plan_id")
+
+  item       Item       @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  launchPlan LaunchPlan @relation(fields: [launchPlanId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, launchPlanId])
+  @@map("item_launch_plans")
+}
+
+/// Execution checklist rows (بنود التنفيذ) — agents/testing/pilot per item.
+model ExecChecklistItem {
+  id        String  @id @default(cuid())
+  itemId    String  @map("item_id")
+  key       String // agents | testing | pilot
+  label     String
+  status    String  @default("لم تبدأ") // لم تبدأ | مكتمل | متأخر
+  newDate   String? @map("new_date")
+  reason    String?
+  sortOrder Int     @default(0) @map("sort_order")
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, key])
+  @@map("exec_checklist_items")
+}
+
+/// Per-item sub-milestones inside the selected execution batch.
+model SubMilestone {
+  id        String  @id @default(cuid())
+  itemId    String  @map("item_id")
+  batchName String  @map("batch_name")
+  name      String
+  startsOn  String? @map("starts_on")
+  endsOn    String? @map("ends_on")
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+  @@map("sub_milestones")
+}
+
+/// Launch plans (خطط الإطلاق) — shared across items via item_launches.
+/// Completion is synchronized: `done` lives here, once for all sharers.
+model Launch {
+  id     String    @id @default(cuid())
+  title  String
+  ltype  String
+  date   String
+  desc   String    @default("")
+  status String    @default("مخطط")
+  done   Boolean   @default(false)
+  doneAt DateTime? @map("done_at")
+
+  items ItemLaunch[]
+
+  @@unique([title, date])
+  @@map("launches")
+}
+
+/// Join: which items participate in which launch (التي تُطلق معاً).
+model ItemLaunch {
+  itemId   String  @map("item_id")
+  launchId String  @map("launch_id")
+  shared   Boolean @default(false)
+
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  launch Launch @relation(fields: [launchId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, launchId])
+  @@map("item_launches")
+}
+
+/// Approval / action log (سجل الاعتمادات والإجراءات).
+model LogEntry {
+  id       String   @id @default(cuid())
+  itemId   String   @map("item_id")
+  action   String // submit | approve | reject | info | nominate | fund | unfund | cancelFund | budget
+  byName   String   @map("by_name")
+  roleName String   @map("role_name")
+  at       DateTime @default(now())
+  note     String   @default("")
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, at])
+  @@map("log_entries")
+}
+
+/// Nomination by رئيس المسار (or synthesized on direct committee funding).
+model Nomination {
+  itemId   String   @id @map("item_id")
+  byName   String   @map("by_name")
+  roleName String   @map("role_name")
+  streamId String   @map("stream_id")
+  at       DateTime
+  direct   Boolean  @default(false)
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("nominations")
+}
+
+/// Committee funding decision (معتمد للتمويل).
+model Funding {
+  itemId String   @id @map("item_id")
+  byName String   @default("اللجنة الوطنية") @map("by_name")
+  at     DateTime
+  direct Boolean  @default(false)
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("fundings")
+}
+
+/// Funding cancellation with its required reason (يُبلَّغ به صاحب العنصر).
+model FundingCancellation {
+  itemId String   @id @map("item_id")
+  byName String   @map("by_name")
+  at     DateTime
+  reason String
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("funding_cancellations")
+}
+
+// ---------------------------------------------------------------------------
+// Demo sync blob (used by /api/state for the client-side demo persistence)
+// ---------------------------------------------------------------------------
+model AppState {
+  id        String   @id @default("singleton")
+  data      Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_state")
+}
+
+/// Login users. Roles: entity (ممثل الجهة), coord (منسق المسار في الجهة),
+/// path (رئيس المسار), ai (اللجنة الوطنية). The five stream heads are
+/// predefined (official names/titles); their emails and phone numbers are
+/// added later for sign-in mapping (UAE PASS / IdP).
+model User {
+  id        String    @id @default(cuid())
+  // Legacy UI role kept for the client screens: entity | coord | path | ai |
+  // admin. Production permissions come from user_roles / role_permissions.
+  role      String
+  name      String
+  title     String    @default("")
+  email     String?   @unique
+  phone     String?
+  streamId  String?   @map("stream_id")
+  entityId  String?   @map("entity_id")
+  isActive  Boolean   @default(true) @map("is_active")
+  lastLogin DateTime? @map("last_login")
+
+  // Production access-management fields.
+  status        String  @default("pending")
+  accessEnabled Boolean @default(false) @map("access_enabled")
+  authProvider  String? @map("auth_provider")
+  externalSub   String? @map("external_sub")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  stream        Stream?        @relation(fields: [streamId], references: [id])
+  entity        Entity?        @relation(fields: [entityId], references: [id])
+  notifications Notification[]
+
+  roles        UserRole[]
+  entityScopes UserEntityScope[]
+  streamScopes UserStreamScope[]
+  auditLogs    AuditLog[]
+
+  @@index([role])
+  @@index([status])
+  @@index([authProvider, externalSub])
+  @@index([entityId])
+  @@index([streamId])
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Production RBAC, data scopes, audit logs & notifications
+// (sessions are stateless HMAC-signed cookies — no table; see lib/security/)
+// ---------------------------------------------------------------------------
+
+/// Backend access role, keyed by a stable `code` (e.g. system_admin,
+/// entity_representative). users.role keeps the legacy UI key for the client;
+/// APIs enforce permissions via user_roles / role_permissions.
+model Role {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  nameAr      String   @map("name_ar")
+  description String?
+  isSystem    Boolean  @default(true) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  roleId    String   @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserEntityScope {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  entityId  String   @map("entity_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entity Entity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, entityId])
+  @@index([entityId])
+  @@map("user_entity_scopes")
+}
+
+model UserStreamScope {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  streamId  String   @map("stream_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stream Stream @relation(fields: [streamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, streamId])
+  @@index([streamId])
+  @@map("user_stream_scopes")
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorUserId  String?  @map("actor_user_id")
+  action       String
+  resourceType String?  @map("resource_type")
+  resourceId   String?  @map("resource_id")
+  entityId     String?  @map("entity_id")
+  streamId     String?  @map("stream_id")
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  metadata     Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([entityId])
+  @@index([streamId])
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+/// Pre-configured email-to-role mapping for auto-assignment on registration.
+/// Admin team adds rules before users register; on first login the system
+/// automatically assigns the specified role + entity/stream scopes.
+model RoleAssignmentRule {
+  id          String    @id @default(cuid())
+  email       String    @unique // the email that triggers this rule
+  roleCode    String    @map("role_code") // e.g. entity_coordinator, entity_representative, stream_owner, ai_committee
+  entityId    String?   @map("entity_id") // optional: assign user to this entity
+  streamId    String?   @map("stream_id") // optional: assign user to this stream
+  displayName String?   @map("display_name") // optional: pre-set display name
+  isConsumed  Boolean   @default(false) @map("is_consumed") // true after user registers
+  consumedAt  DateTime? @map("consumed_at")
+  consumedBy  String?   @map("consumed_by") // user ID who consumed this rule
+  createdBy   String?   @map("created_by") // admin who created the rule
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@index([roleCode])
+  @@index([isConsumed])
+  @@map("role_assignment_rules")
+}
+
+/// Persisted notification (الإشعارات). Targeted to a user, or broadcast to a
+/// role / entity / stream. Today notifications are derived in the client; this
+/// table lets IT persist and push them (email/SMS) from the API layer.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String?   @map("user_id") // specific recipient (optional)
+  role      String? // broadcast to a role
+  entityId  String?   @map("entity_id") // broadcast within an entity
+  streamId  String?   @map("stream_id") // broadcast within a stream
+  itemId    String?   @map("item_id") // related item
+  kind      String // return | nominate | fund | unfund | stageMove | approve | submit | info
+  title     String
+  body      String    @default("")
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([role])
+  @@index([entityId])
+  @@index([streamId])
+  @@map("notifications")
+}

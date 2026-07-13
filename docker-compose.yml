@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: portal
+      POSTGRES_PASSWORD: portal
+      POSTGRES_DB: transformation
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U portal -d transformation']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      # Production build defaults: Postgres API mode, real UAE PASS, NO
+      # role-switcher, NO demo data. These are baked into the client bundle at
+      # build time; change them here (not at runtime) if you need to.
+      args:
+        NEXT_PUBLIC_DATA_MODE: api
+        NEXT_PUBLIC_UAEPASS_MODE: live
+        NEXT_PUBLIC_DEMO_MODE: '0'
+        NEXT_PUBLIC_DEMO_DATA: '0'
+        # Backend-auth mode: 'mock' (dev), 'uaepass' or 'workspaceone' (prod).
+        # Must match AUTH_PROVIDER in .env; baked into the client at build time.
+        NEXT_PUBLIC_AUTH_PROVIDER: mock
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # Runtime configuration comes from the .env file IT fills in
+    # (copy .env.example → .env). DATABASE_URL is overridden here to point at
+    # the compose "db" service instead of localhost.
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://portal:portal@db:5432/transformation?schema=public
+    ports:
+      - '3000:3000'
+    # Apply the versioned migrations (0001→0009), seed reference data (streams,
+    # entities, phases, roles, and starter accounts — NO portfolio items), then
+    # start the server. `migrate deploy` is idempotent and safe to re-run.
+    command: sh -c "npx prisma migrate deploy && npx tsx prisma/seed.ts && npm run start"
+
+volumes:
+  pgdata:

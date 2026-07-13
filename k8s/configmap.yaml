@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aitp-config
+  namespace: aitp
+data:
+  NEXT_PUBLIC_DATA_MODE: "api"
+  NEXT_PUBLIC_DEFAULT_ROLE: "entity"
+  NEXT_PUBLIC_UAEPASS_MODE: "mock" # switch to "live" once UAE PASS creds are set
+  UAEPASS_ENV: "staging"
+  AI_API_BASE_URL: ""
+  AI_MODEL: "default"

@@ -1,0 +1,383 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---- base ---- */
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+body {
+  /* IBM Plex Sans Arabic is the base for all content */
+  font-family: var(--font-base), 'Cairo', system-ui, sans-serif;
+  direction: rtl;
+  font-weight: 400;
+  color: #0f1f3d;
+  /* subtle futuristic backdrop: soft blue mesh over a light base */
+  background-color: #eef2f9;
+  background-image:
+    radial-gradient(900px 520px at 92% -6%, rgba(39, 194, 240, 0.10), transparent 60%),
+    radial-gradient(1100px 640px at -12% 22%, rgba(37, 99, 235, 0.08), transparent 62%),
+    radial-gradient(760px 480px at 55% 118%, rgba(22, 64, 143, 0.07), transparent 58%),
+    linear-gradient(180deg, #f2f6fc 0%, #eef2f9 42%, #eaf0f9 100%);
+  background-attachment: fixed;
+  /* The global content scale (density zoom) is applied responsively from JS
+     (see ResponsiveZoom): 1.15 on desktop, 1 on tablet, 0.9 on small phones.
+     It lives in JS because the CSS minifier collapses `zoom` inside media
+     queries back into the base rule. Tour.tsx reads the live value. */
+}
+/* Headings and titles: same family, bold weight */
+h1,
+h2,
+h3,
+.hd {
+  font-family: var(--font-base), system-ui, sans-serif;
+  font-weight: 700;
+}
+button {
+  font-family: inherit;
+}
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+/* RTL selects: replace the native arrow (which sticks to the border) with a
+   padded chevron on the left */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238A97AD' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 14px center;
+  background-size: 15px;
+  padding-left: 38px !important;
+}
+
+/* ---- rich text (editor + rendered values) ---- */
+[data-rte]:empty::before {
+  content: attr(data-placeholder);
+  color: #9aa6bc;
+  font-weight: 400;
+  pointer-events: none;
+}
+[data-rte] ul,
+.rte-view ul {
+  list-style: disc;
+  list-style-position: outside;
+  margin: 4px 0;
+  padding-right: 24px;
+}
+[data-rte] ol,
+.rte-view ol {
+  list-style: decimal;
+  list-style-position: outside;
+  margin: 4px 0;
+  padding-right: 24px;
+}
+[data-rte] li,
+.rte-view li {
+  margin-bottom: 2px;
+}
+
+/* ---- keyframes (verbatim from prototype) ---- */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pulseGlow {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes slideIn {
+  from {
+    transform: translateX(-40px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes slideInRight {
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---- scrollbar ---- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e6;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* ---- responsive (verbatim keys from prototype) ---- */
+@media (max-width: 900px) {
+  /* column layout must STRETCH its children: with the desktop align-items
+     (flex-start) the content column sizes to its min-content and spills past
+     the left edge in RTL */
+  [data-r='work'] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  [data-r='work'] > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+  [data-r='rail'] {
+    width: 100% !important;
+    position: static !important;
+  }
+  [data-r='cards'] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  [data-r='panel'] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  /* the two summary donut cards (cost + inputs) are a GRID — collapse to one
+     full-width column per row (flex-direction is a no-op on a grid) */
+  [data-r='dash-top'] {
+    grid-template-columns: 1fr !important;
+    align-items: stretch !important;
+    gap: 14px !important;
+  }
+  [data-r='form2'] {
+    grid-template-columns: 1fr !important;
+  }
+}
+/* reusable responsive grids: collapse dense multi-column field grids (used in
+   the detail drawer + dense stat rows) on phones. minmax(0,1fr) lets cells
+   shrink below their content's min width — plain 1fr overflows the viewport
+   on the left in RTL. */
+@media (max-width: 640px) {
+  .rgrid-1 { grid-template-columns: minmax(0, 1fr) !important; }
+  .rgrid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .rgrid-1 > *, .rgrid-2 > * { min-width: 0 !important; max-width: 100% !important; }
+}
+@media (max-width: 600px) {
+  [data-r='cards'] {
+    grid-template-columns: 1fr !important;
+  }
+  [data-r='stagedeliv'] {
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)) !important;
+  }
+  [data-r='kpi'] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  [data-r='countdown'] {
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+  }
+  [data-r='form3'] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ---- responsive overrides (data-r hooks; !important beats inline styles) ---- */
+@media (max-width: 1280px) {
+  [data-r='cards'] { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 1100px) {
+  /* the fixed rail becomes a static block above the content */
+  [data-r='root'] { padding-right: 0 !important; }
+  [data-r='work'] { flex-direction: column !important; }
+  [data-r='rail'] {
+    position: static !important;
+    width: 100% !important;
+    border-left: none !important;
+    border: 1px solid #e7ecf4 !important;
+    border-radius: 16px !important;
+  }
+  /* navigation flows as wrapping pills instead of a tall column */
+  [data-r='navlist'] {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    overflow: visible !important;
+    padding: 10px !important;
+  }
+  [data-r='navlist'] button {
+    margin-right: 0 !important;
+    border-right: none !important;
+    border-radius: 11px !important;
+  }
+  [data-r='navlist'] button > span:first-child { display: none !important; }
+  [data-r='railhelp'] { display: none !important; }
+  [data-r='brand'] { padding: 12px !important; }
+  [data-r='kpi'] { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important; }
+}
+@media (max-width: 900px) {
+  /* On mobile EVERY card grid becomes a single full-width column per row.
+     minmax(0,1fr) + min-width:0 keep cells from overflowing the viewport on
+     the left (RTL) when their content's min width exceeds the screen. */
+  [data-tour='stages'],
+  [data-r='entcards'],
+  [data-r='seccards'],
+  [data-r='cards'],
+  [data-r='reco'],
+  [data-r='dash-top'] { grid-template-columns: minmax(0, 1fr) !important; }
+  [data-tour='stages'] > *,
+  [data-r='entcards'] > *,
+  [data-r='seccards'] > *,
+  [data-r='cards'] > *,
+  [data-r='reco'] > *,
+  [data-r='dash-top'] > * { min-width: 0 !important; max-width: 100% !important; }
+  /* flex stat panels: min-width:auto blocks shrinking below content width */
+  [data-tour='nom-status'] { min-width: 0 !important; }
+  [data-tour='nom-status'] > * { min-width: 0 !important; max-width: 100% !important; }
+  /* the KPI band is a FLEX row (grid-template rules are inert on it): inline
+     min-widths on its cells pushed the whole content column off-screen left */
+  [data-r='kpi'] { min-width: 0 !important; }
+  [data-r='kpi'] > * { min-width: 0 !important; }
+  /* ---- mobile navigation: full-screen hamburger drawer ---- */
+  /* hamburger button + «الكل» chevron + drawer close become visible */
+  [data-r='hamburger'], [data-r='navchev'], [data-r='railclose'] { display: inline-flex !important; }
+  /* the rail is hidden until the hamburger opens it */
+  [data-r='rail'].mnav-closed { display: none !important; }
+  /* when open it takes over the whole screen as a vertical menu */
+  [data-r='rail'] {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    z-index: 80 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow-y: auto !important;
+  }
+  /* items run vertically, one under the other (override the ≤1100 row-wrap) */
+  [data-r='navlist'] {
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    overflow: visible !important;
+    padding: 14px !important;
+    gap: 4px !important;
+  }
+  [data-r='navlist'] button {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    border-radius: 12px !important;
+    /* larger, comfortably tappable rows */
+    padding: 14px 16px !important;
+    font-size: 15.5px !important;
+  }
+  /* restore the nav icons inside the drawer */
+  [data-r='navlist'] button > span:first-child { display: inline-flex !important; }
+  /* keep the count badge next to its label instead of drifting to the far edge */
+  [data-r='navcount'] { margin-inline-start: 8px !important; font-size: 12.5px !important; }
+  [data-tour='basket'] button { font-size: 15px !important; padding: 13px 15px !important; }
+  /* the usage-guide card returns inside the full-screen drawer (the ≤1100
+     tablet row-nav hides it) */
+  [data-r='rail'] [data-r='railhelp'] { display: block !important; }
+  /* stream/type sub-items stay collapsed under «الكل» until it is expanded */
+  .mnav-collapsed { display: none !important; }
+}
+/* ---- mobile filters: one trigger button + full-screen sheet ---- */
+@media (max-width: 700px) {
+  /* phones: every KPI stat takes a full-width row (kpi is flex, not grid) */
+  [data-r='kpi'] > * { flex: 1 1 100% !important; }
+  [data-r='filterbtn'] { display: inline-flex !important; }
+  [data-r='filters'] { display: none !important; }
+  [data-r='filters'].mfilters-open {
+    display: flex !important;
+    position: fixed;
+    inset: 0;
+    z-index: 95;
+    background: #fff;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    flex-wrap: nowrap !important;
+    gap: 12px !important;
+    padding: 18px 16px 24px;
+    overflow-y: auto;
+  }
+  [data-r='filters'].mfilters-open > * { width: 100% !important; }
+  /* only the sheet's own controls — NOT inputs nested inside dropdown panels
+     (the entity picker has its own compact search box) */
+  [data-r='filters'].mfilters-open > div > input,
+  [data-r='filters'].mfilters-open > select {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 46px !important;
+    font-size: 14.5px !important;
+  }
+  [data-r='filters'].mfilters-open > button { height: 46px !important; font-size: 14px !important; }
+  /* the custom dropdowns (entity picker + filter selects) stretch full width */
+  [data-r='filters'].mfilters-open [data-r='entfilter'],
+  [data-r='filters'].mfilters-open [data-r='fselect'] { width: 100% !important; }
+  [data-r='filters'].mfilters-open [data-r='entfilter'] > div:first-of-type,
+  [data-r='filters'].mfilters-open [data-r='fselect'] > div:first-of-type {
+    display: flex !important;
+    width: 100% !important;
+    height: 46px;
+    align-items: center;
+  }
+  [data-r='filters'].mfilters-open [data-r='entfilter'] > div:last-of-type:not(:first-of-type),
+  [data-r='filters'].mfilters-open [data-r='fselect'] > div:last-of-type:not(:first-of-type) { width: 100% !important; max-width: 100% !important; }
+  /* dropdown panels anchor LEFT to their trigger, which shoves them off-screen
+     in RTL on phones — anchor to the trigger's right edge so they open inward */
+  [data-r='entfilter'] > div:last-of-type:not(:first-of-type),
+  [data-r='fselect'] > div:last-of-type:not(:first-of-type) {
+    left: auto !important;
+    right: 0 !important;
+  }
+  [data-r='mfhead'] { display: flex !important; }
+  [data-r='mfhead'] button { width: 38px !important; height: 38px !important; font-size: 17px !important; flex: none !important; }
+  [data-r='mfapply'] { display: inline-flex !important; margin-top: auto; height: 48px !important; font-size: 15px !important; }
+}
+@media (max-width: 820px) {
+  [data-r='cards'] { grid-template-columns: 1fr !important; }
+  [data-r='reco'] { grid-template-columns: 1fr !important; }
+  [data-r='hdr'] { flex-wrap: wrap !important; row-gap: 8px; padding: 10px 14px !important; }
+  [data-r='hdr'] img { height: 44px !important; }
+  [data-r='hdrpills'] { overflow-x: auto; max-width: 100%; }
+  [data-r='work'] { padding: 12px 14px 36px !important; }
+  [data-r='actions'] > * { flex-shrink: 1; }
+  /* stat bands stack: side borders become row separators */
+  [data-r='statband'] { flex-direction: column !important; }
+  [data-r='statband'] > div { border-left: none !important; }
+  [data-r='statband'] > div + div { border-top: 1px solid #ebeff6 !important; }
+}
+
+/* rejection CTA: slightly darker red on hover (inline styles can't hover) */
+.btn-danger:hover { background: #B91C1C !important; }
